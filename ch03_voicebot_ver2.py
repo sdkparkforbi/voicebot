@@ -3,7 +3,12 @@ import streamlit as st
 # audiorecorder 패키지 추가
 from audiorecorder import audiorecorder
 # OpenAI 패키지 추가
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key='') 
+
+# import openai
+
 # 파일 삭제를 위한 패키지 추가
 import os
 # 시간 정보를 위한 패키지 추가
@@ -14,23 +19,37 @@ from gtts import gTTS
 import base64
 
 ##### 기능 구현 함수 #####
-def STT(audio):
+# def STT(audio):
+def STT(audio, client):
     # 파일 저장
     filename='input.mp3'
     audio.export(filename, format="mp3")
     # 음원 파일 열기
     audio_file = open(filename, "rb")
+
     # Whisper 모델을 활용해 텍스트 얻기
-    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+    # transcript = openai.Audio.transcribe("whisper-1", audio_file)
+
+    transcript = client.audio.transcriptions.create(
+        model="whisper-1", 
+        file=audio_file
+    )
+
     audio_file.close()
     # 파일 삭제
     os.remove(filename)
-    return transcript["text"]
+    return transcript.text
+    # return transcript["text"]
 
 def ask_gpt(prompt, model):
-    response = openai.ChatCompletion.create(model=model, messages=prompt)
-    system_message = response["choices"][0]["message"]
-    return system_message["content"]
+    
+    # response = openai.ChatCompletion.create(model=model, messages=prompt)
+    response = client.chat.completions.create(model=model, messages=prompt)
+
+    # system_message = response["choices"][0]["message"]
+    system_message = response.choices[0].message
+    # return system_message["content"]
+    return system_message.content
 
 def TTS(response):
     # gTTS 를 활용하여 음성 파일 생성
@@ -53,10 +72,16 @@ def TTS(response):
 
 ##### 메인 함수 #####
 def main():
+
     # 기본 설정
     st.set_page_config(
         page_title="음성 비서 프로그램",
         layout="wide")
+    
+        # 제목 
+    st.header("음성 비서 프로그램")
+    # 구분선
+    st.markdown("---")
 
     # session state 초기화
     if "chat" not in st.session_state:
@@ -67,11 +92,6 @@ def main():
 
     if "check_reset" not in st.session_state:
         st.session_state["check_reset"] = False
-
-    # 제목 
-    st.header("음성 비서 프로그램")
-    # 구분선
-    st.markdown("---")
 
     # 기본 설명
     with st.expander("음성비서 프로그램에 관하여", expanded=True):
@@ -90,8 +110,9 @@ def main():
     with st.sidebar:
 
         # Open AI API 키 입력받기
-        openai.api_key = st.text_input(label="OPENAI API 키", placeholder="Enter Your API Key", value="", type="password")
-
+        client.api_key = st.text_input(label="OPENAI API 키", placeholder="Enter Your API Key", value="", type="password")
+        # openai.api_key = st.text_input(label="OPENAI API 키", placeholder="Enter Your API Key", value="", type="password")
+  
         st.markdown("---")
 
         # GPT 모델을 선택하기 위한 라디오 버튼 생성
@@ -117,7 +138,8 @@ def main():
             # 음성 재생 
             st.audio(audio.export().read())
             # 음원 파일에서 텍스트 추출
-            question = STT(audio)
+            question = STT(audio, client)
+            # question = STT(audio)
 
             # 채팅을 시각화하기 위해 질문 내용 저장
             now = datetime.now().strftime("%H:%M")
